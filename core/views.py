@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from .models import Profile, Post
+from .models import Profile, Post, LikePost
 
 
 @login_required(login_url='signin')
@@ -13,6 +13,28 @@ def index(request):
 
     posts = Post.objects.all()
     return render(request, 'index.html', {'user_profile': user_profile, 'posts': posts})
+
+
+@login_required(login_url='signin')
+def like_post(request):
+    username = request.user.username
+    post_id = request.GET.get('post_id')
+
+    post = Post.objects.get(id=post_id)
+
+    like_filter = LikePost.objects.filter(post_id=post_id, username=username).first()
+
+    if like_filter == None:
+        new_like = LikePost.objects.create(post_id=post_id, username=username)
+        new_like.save()
+        post.no_of_likes = post.no_of_likes+1
+        post.save()
+        return redirect('/')
+    else:
+        like_filter.delete()
+        post.no_of_likes = post.no_of_likes-1
+        post.save()
+        return redirect('/')
 
 
 @login_required(login_url='signin')
@@ -81,15 +103,10 @@ def signup(request):
                 messages.info(request, 'Username Taken')
                 return redirect('signup')
             else:
-                user = User.objects.create(
-                    username=username,
-                    email=email,
-                    password=password
-                )
+                user = User.objects.create(username=username, email=email, password=password)
                 user.save()
 
                 # Log user in and redirect to settings page
-
                 user_login = auth.authenticate(username=username, password=password)
                 auth.login(request, user_login)
 
@@ -106,6 +123,7 @@ def signup(request):
 
 
 def signin(request):
+
     if request.method == 'POST':
         username = request.POST['username']
         password = request.POST['password']
