@@ -16,13 +16,34 @@ def index(request):
 
 
 @login_required(login_url='signin')
+def upload(request):
+
+    if request.method == 'POST':
+        user = request.user.username
+        image = request.FILES.get('image_upload')
+        caption = request.POST['caption']
+
+        new_post = Post.objects.create(
+            user=user,
+            image=image,
+            caption=caption
+        )
+        new_post.save()
+
+        return redirect('/')
+    else:
+        return redirect('/')
+
+
+@login_required(login_url='signin')
 def like_post(request):
     username = request.user.username
     post_id = request.GET.get('post_id')
 
     post = Post.objects.get(id=post_id)
 
-    like_filter = LikePost.objects.filter(post_id=post_id, username=username).first()
+    like_filter = LikePost.objects.filter(
+        post_id=post_id, username=username).first()
 
     if like_filter == None:
         new_like = LikePost.objects.create(post_id=post_id, username=username)
@@ -37,31 +58,29 @@ def like_post(request):
         return redirect('/')
 
 
-@login_required(login_url='signin')
-def upload(request):
-     
-    if request.method == 'POST':
-        user = request.user.username
-        image = request.FILES.get('image_upload')
-        caption = request.POST['caption']
 
-        new_post = Post.objects.create(
-            user=user,
-            image=image,
-            caption=caption
-        )
-        new_post.save()
-        
-        return redirect('/')
-    else:
-        return redirect('/')
-    
+@login_required(login_url='signin')
+def profile(request, pk):
+    user_object = User.objects.get(username=pk)
+    user_profile = Profile.objects.get(user=user_object)
+    user_posts = Post.objects.filter(user=pk)
+    user_posts_length = len(user_posts)
+
+    context = {
+        'user_object': user_object,
+        'user_profile': user_profile,
+        'user_posts': user_posts,
+        'user_posts_length': user_posts_length
+
+    }
+    return render(request, 'profile.html', context)
+
 
 @login_required(login_url='signin')
 def settings(request):
     user_profile = Profile.objects.get(user=request.user)
 
-    if request.method == 'POST':       
+    if request.method == 'POST':
 
         if request.FILES.get('image') == None:
             image = user_profile.profileimg
@@ -103,16 +122,19 @@ def signup(request):
                 messages.info(request, 'Username Taken')
                 return redirect('signup')
             else:
-                user = User.objects.create(username=username, email=email, password=password)
+                user = User.objects.create(
+                    username=username, email=email, password=password)
                 user.save()
 
                 # Log user in and redirect to settings page
-                user_login = auth.authenticate(username=username, password=password)
+                user_login = auth.authenticate(
+                    username=username, password=password)
                 auth.login(request, user_login)
 
                 # create a Profile object for the new user
                 user_model = User.objects.get(username=username)
-                new_profile = Profile.objects.create(user=user_model, id_user=user_model.id)
+                new_profile = Profile.objects.create(
+                    user=user_model, id_user=user_model.id)
                 new_profile.save()
                 return redirect('settings')
         else:
