@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from .models import Profile, Post, LikePost
+from .models import Profile, Post, LikePost, FollowersCount
 
 
 @login_required(login_url='signin')
@@ -66,15 +66,47 @@ def profile(request, pk):
     user_posts = Post.objects.filter(user=pk)
     user_posts_length = len(user_posts)
 
+    follower = request.user.username
+    user = pk
+
+    if FollowersCount.objects.filter(follower=follower, user=user).first():
+        button_text = 'Unfollow'
+    else:
+        button_text = 'Follow'
+
+    user_followers = len(FollowersCount.objects.filter(user=pk))
+    user_following = len(FollowersCount.objects.filter(follower=pk))
+
+
     context = {
         'user_object': user_object,
         'user_profile': user_profile,
         'user_posts': user_posts,
-        'user_posts_length': user_posts_length
+        'user_posts_length': user_posts_length, 
+        'button_text': button_text,
+        'user_followers': user_followers,
+        'user_following': user_following
 
     }
     return render(request, 'profile.html', context)
 
+
+@login_required(login_url='signin')
+def follow(request):
+    if request.method == 'POST':
+        follower = request.POST['follower']
+        user = request.POST['user']
+
+        if FollowersCount.objects.filter(follower=follower, user=user).first():
+            delete_follower = FollowersCount.objects.get(follower=follower, user=user)
+            delete_follower.delete()
+            return redirect('/profile/'+user)
+        else:
+            new_follower = FollowersCount.objects.create(follower=follower, user=user)
+            new_follower.save()
+            return redirect('/profile/'+user)
+    else:
+        return redirect('/')
 
 @login_required(login_url='signin')
 def settings(request):
@@ -122,26 +154,24 @@ def signup(request):
                 messages.info(request, 'Username Taken')
                 return redirect('signup')
             else:
-                user = User.objects.create(
-                    username=username, email=email, password=password)
+                user = User.objects.create_user(username=username, email=email, password=password)
                 user.save()
 
                 # Log user in and redirect to settings page
-                user_login = auth.authenticate(
-                    username=username, password=password)
+                user_login = auth.authenticate(username=username, password=password)
                 auth.login(request, user_login)
 
                 # create a Profile object for the new user
                 user_model = User.objects.get(username=username)
-                new_profile = Profile.objects.create(
-                    user=user_model, id_user=user_model.id)
+                new_profile = Profile.objects.create(user=user_model, id_user=user_model.id)
                 new_profile.save()
                 return redirect('settings')
         else:
             messages.info(request, 'Password Not Matching')
             return redirect('signup')
 
-    return render(request, 'signup.html')
+    else:
+        return render(request, 'signup.html')
 
 
 def signin(request):
